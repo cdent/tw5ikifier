@@ -66,41 +66,61 @@ Wikifier.prototype.render = function(tiddlerTitle, contextURI, authToken) {
     this.contextURI = contextURI;
     this.authToken = authToken;
     this.emitter = emitter;
+    var dependencyCount = 0;
 
     this.getTiddler(tiddlerTitle, function(content) {
         addTiddlerContentToStore(self.store, content);
         var dependencies = self.store
             .parseTiddler(self.tiddlerTitle).dependencies;
-        console.log('DP', dependencies);
-        if (dependencies === null) {
-            self.getTiddlers(self.processTiddlers, emiterror);
-        } else if (dependencies) {
+        if (dependencies.dependentAll) {
+            self.getTiddlers(dependencies, self.processTiddlers, emiterror);
+        } else if (dependencies.include || dependencies.link) {
             self.processTiddlers(dependencies);
         } else {
-            renderTiddler(emitter);
+            renderTiddler(self.store, tiddlerTitle, emitter);
         }
-    },
-    emiterror);
+    }, emiterror);
 
     return emitter;
 };
 
-Wikifier.prototype.processTiddlers = function(tiddlers) {
+Wikifier.prototype.processTiddlers = function(dependencies) {
     var count = 1
-        , tiddlerCount = tiddlers.length
         , self = this;
-    for (var i = 0; i < tiddlers.length; i++) {
-        if (!(/^http/i).test(tiddlers[i])) {
-            this.getTiddler(tiddlers[i], function(content) {
-                addTiddlerContentToStore(self.store, content);
+    var tiddlers = [];
+    if (dependencies.include) {
+        tiddlers = tiddlers.concat(Object.keys(dependencies.include));
+    }
+    if (dependencies.link) {
+        tiddlers = tiddlers.concat(Object.keys(dependencies.link));
+    }
+    var tiddlerCount = tiddlers.length;
+    if (tiddlerCount == 0) {
+        renderTiddler(self.store, self.tiddlerTitle, self.emitter);
+    } else {
+        for (var i = 0; i < tiddlers.length; i++) {
+            if (!(/^http/i).test(tiddlers[i])) {
+                this.getTiddler(tiddlers[i], function(content) {
+                    addTiddlerContentToStore(self.store, content);
+                    if (count >= tiddlerCount) {
+                        renderTiddler(self.store, self.tiddlerTitle,
+                            self.emitter);
+                    }
+                    count++;
+                }, function(err) {
+                    tiddlerCount--;
+                    if (count >= tiddlerCount) {
+                        renderTiddler(self.store, self.tiddlerTitle,
+                            self.emitter);
+                    }
+                });
+            } else {
+                tiddlerCount--;
                 if (count >= tiddlerCount) {
                     renderTiddler(self.store, self.tiddlerTitle,
                         self.emitter);
                 }
-                count++;
-            }, function(err) {});
-        } else {
-            tiddlerCount--;
+            }
         }
     }
 };
@@ -147,18 +167,19 @@ Wikifier.prototype.getTiddler = function(title, callback, errback) {
     });
 };
 
-Wikifier.prototype.getTiddlers = function(callback, errback) {
+Wikifier.prototype.getTiddlers = function(dependencies, callback, errback) {
     var parsed_uri = url.parse(this.contextURI)
         , client = http.createClient(parsed_uri.port ? parsed_uri.port : 80,
             parsed_uri.hostname)
-        , self = this;
+        , self = this
+        , getTiddlersEmit = new Emitter();
 
     client.on('error', function(err) {
         errback(err);
     });
     var request = client.request('GET', parsed_uri.pathname, {
         'host': parsed_uri.hostname,
-        'accept': 'text/plain',
+        'accept': 'application/json',
         'cookie': this.authToken,
         'user-agent': 'wikifier thang',
         'x-controlview': 'false' // not needed?
@@ -179,9 +200,24 @@ Wikifier.prototype.getTiddlers = function(callback, errback) {
                 content += chunk;
             });
             response.on('end', function() {
-                content = content.replace(/^\s+/, '').replace(/\s+$/, '');
-                var tiddlers = content.split("\n");
-                callback.apply(self, [tiddlers]);
+                try {
+                    var tiddlersData = JSON.parse(content);
+                } catch (err) {
+                    console.warn('json parse error for all tiddlers', err);
+                }
+                for (var i = 0; i < tiddlersData.length; i++) {
+                    if (tiddlersData[i].title !== self.tiddlerTitle) {
+                        tiddlersData[i].modified =
+                            utils.convertFromYYYYMMDDHHMMSS(
+                                tiddlersData[i].modified);
+                        tiddlersData[i].created =
+                            utils.convertFromYYYYMMDDHHMMSS(
+                                tiddlersData[i].created);
+                        tiddlersData[i].text = '';
+                        self.store.addTiddler(new Tiddler(tiddlersData[i]));
+                    }
+                }
+                callback.apply(self, [dependencies]);
             });
         } else {
             console.warn(response.statusCode, contextURI, title);
@@ -208,8 +244,6 @@ function addTiddlerContentToStore(store, content) {
         console.warn('json parse error with', content);
     }
 }
-
-
 
 exports.Wikifier = Wikifier;
 
