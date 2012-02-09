@@ -1,0 +1,27 @@
+
+A nodejs-based wikitext rendering system for TiddlySpace and TiddlyWeb
+using TiddlyWiki5 as a library.
+
+The server, wikify.js, listens on a Unix socket for:
+
+* tiddler title
+* context URI (the collection in which this tiddler resides)
+* option authToken (a tiddlyweb_user cookie)
+
+Combined these things allow wikify.js to create a TiddlyWiki store
+and render the current tiddler, with macros.
+
+Currently wikify.js expects to find its library code in a local
+directory call tiddlywiki5. This is a symlink to the js directory
+in the TiddlyWiki5 github repository. Similarly for the parsers.
+
+For the time being testing can be done using netcat:
+
+echo -e \
+    'HelloThere\00http://cdent.tiddlyspace.com/recipes/cdent_public/tiddlers' \
+    | nc -U /tmp/wikify.sock 
+
+TiddlySpace: http://tiddlyspace.com
+TiddlyWeb: http://tiddlyweb.com
+TiddlyWiki5: http://tiddlywiki.com/tiddlywiki5/
+ its github: https://github.com/Jermolene/TiddlyWiki5
