@@ -16,15 +16,13 @@ var WikiStore = require("./tiddlywiki5/WikiStore.js").WikiStore
     // require macros once, not per wikifier
     , echo = require("./tiddlywiki5/macros/echo.js").macro
     , image = require("./tiddlywiki5/macros/image.js").macro
-    , info = require("./tiddlywiki5/macros/info.js").macro
     , link = require("./tiddlywiki5/macros/link.js").macro
     , list = require("./tiddlywiki5/macros/list.js").macro
     , slider = require("./tiddlywiki5/macros/slider.js").macro
     , story = require("./tiddlywiki5/macros/story.js").macro
     , tiddler = require("./tiddlywiki5/macros/tiddler.js").macro
     , version = require("./tiddlywiki5/macros/version.js").macro
-    , view = require("./tiddlywiki5/macros/view.js").macro
-    , pegjs = require("fs").readFileSync("parsers/javascript.pegjs", "utf8");
+    , view = require("./tiddlywiki5/macros/view.js").macro;
 
 var Wikifier = function() {
     var t;
@@ -32,12 +30,10 @@ var Wikifier = function() {
     this.store = new WikiStore({disableHtmlWrapperNodes: true});    
     // Register the parsers
     this.store.registerParser("text/x-tiddlywiki",new WikiTextParser({store: this.store}));
-    // Set up the JavaScript parser. Currently a hack; the idea is that the parsers would be loaded through a boot recipe
-        this.store.jsParser = new JavaScriptParser(pegjs);
+    this.store.registerParser("application/javascript",new JavaScriptParser({store: this.store}));
     // Bit of a hack to set up the macros
     this.store.installMacro(echo);
     this.store.installMacro(image);
-    this.store.installMacro(info);
     this.store.installMacro(link);
     this.store.installMacro(list);
     this.store.installMacro(slider);
@@ -74,7 +70,7 @@ Wikifier.prototype.render = function(tiddlerTitle, contextURI, authToken) {
             .parseTiddler(self.tiddlerTitle).dependencies;
         if (dependencies.dependentAll) {
             self.getTiddlers(dependencies, self.processTiddlers, emiterror);
-        } else if (dependencies.include || dependencies.link) {
+        } else if (dependencies.tiddlers) {
             self.processTiddlers(dependencies);
         } else {
             renderTiddler(self.store, tiddlerTitle, emitter);
@@ -88,11 +84,8 @@ Wikifier.prototype.processTiddlers = function(dependencies) {
     var count = 1
         , self = this;
     var tiddlers = [];
-    if (dependencies.include) {
-        tiddlers = tiddlers.concat(Object.keys(dependencies.include));
-    }
-    if (dependencies.link) {
-        tiddlers = tiddlers.concat(Object.keys(dependencies.link));
+    if (dependencies.tiddlers) {
+        tiddlers = tiddlers.concat(Object.keys(dependencies.tiddlers));
     }
     var tiddlerCount = tiddlers.length;
     if (tiddlerCount == 0) {
