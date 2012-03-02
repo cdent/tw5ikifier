@@ -64,16 +64,16 @@ Wikifier.prototype.render = function(tiddlerTitle, contextURI, authToken) {
     this.emitter = emitter;
     var dependencyCount = 0;
 
-    this.getTiddler(tiddlerTitle, function(content) {
+    this.getTiddler(tiddlerTitle, function(title, content) {
         addTiddlerContentToStore(self.store, content);
         var dependencies = self.store
-            .parseTiddler(self.tiddlerTitle).dependencies;
+            .parseTiddler(title).dependencies;
         if (dependencies.dependentAll) {
             self.getTiddlers(dependencies, self.processTiddlers, emiterror);
         } else if (dependencies.tiddlers) {
             self.processTiddlers(dependencies);
         } else {
-            renderTiddler(self.store, tiddlerTitle, emitter);
+            renderTiddler(self.store, title, emitter);
         }
     }, emiterror);
 
@@ -93,8 +93,20 @@ Wikifier.prototype.processTiddlers = function(dependencies) {
     } else {
         for (var i = 0; i < tiddlers.length; i++) {
             if (!(/^http/i).test(tiddlers[i])) {
-                this.getTiddler(tiddlers[i], function(content) {
+                var currentTiddler = tiddlers[i]
+                this.getTiddler(currentTiddler, function(title, content) {
                     addTiddlerContentToStore(self.store, content);
+                    if (dependencies.tiddlers[title]) {
+                        tiddlerCount++;
+                        var subdependencies = self.store
+                            .parseTiddler(title).dependencies;
+                        if (subdependencies.dependentAll) {
+                            self.getTiddlers(subdependencies,
+                                self.processTiddlers, emiterror);
+                        } else if (subdependencies.tiddlers) {
+                            self.processTiddlers(subdependencies);
+                        }
+                    }
                     if (count >= tiddlerCount) {
                         renderTiddler(self.store, self.tiddlerTitle,
                             self.emitter);
@@ -151,7 +163,7 @@ Wikifier.prototype.getTiddler = function(title, callback, errback) {
                 content += chunk;
             });
             response.on('end', function() {
-                callback.apply(self, [content]);
+                callback.apply(self, [title, content]);
             });
         } else {
             console.warn(response.statusCode, self.contextURI, title);
