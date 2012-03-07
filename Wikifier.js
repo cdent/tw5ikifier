@@ -55,107 +55,74 @@ Wikifier.prototype.render = function(tiddlerTitle, contextURI, authToken) {
     var emitter = new Emitter()
         , emiterror = function(err) {
             emitter.emit('error', err);
-        }
-        , self = this;
+        };
 
     this.tiddlerTitle = tiddlerTitle;
     this.contextURI = contextURI;
     this.authToken = authToken;
     this.emitter = emitter;
-    var dependencyCount = 0;
+    this.emiterror = emiterror;
+    this.dependentTiddlers = {};
+    this.dependentTiddlers[tiddlerTitle] = true;
 
-    this.getTiddler(tiddlerTitle, function(title, content) {
-        addTiddlerContentToStore(self.store, content);
-        var dependencies = self.store
-            .parseTiddler(title).dependencies;
-        if (dependencies.dependentAll) {
-            self.getTiddlers(dependencies, self.processTiddlers, emiterror);
-        } else if (dependencies.tiddlers) {
-            self.processTiddlers(dependencies);
-        } else {
-            renderTiddler(self.store, title, emitter);
-        }
-    }, emiterror);
+    this.processTiddlers();
 
     return emitter;
 };
 
-Wikifier.prototype.processTiddlers = function(dependencies) {
-    var count = 1
-        , self = this;
-    var tiddlers = [];
-    if (dependencies.tiddlers) {
-        tiddlers = tiddlers.concat(Object.keys(dependencies.tiddlers));
-    }
-    var tiddlerCount = tiddlers.length;
-    if (tiddlerCount == 0) {
+Wikifier.prototype.processTiddlers = function() {
+    var self = this;
+    var tiddlers = Object.keys(this.dependentTiddlers);
+    if (tiddlers.length == 0) {
         renderTiddler(self.store, self.tiddlerTitle, self.emitter);
     } else {
-        for (var i = 0; i < tiddlers.length; i++) {
-            if (!(/^http/i).test(tiddlers[i])) {
-                var currentTiddler = tiddlers[i]
-                this.getTiddler(currentTiddler, function(title, content) {
-                    addTiddlerContentToStore(self.store, content);
-                    if (dependencies.tiddlers[title]) {
-                        tiddlerCount++;
-                        var subdependencies = self.store
-                            .parseTiddler(title).dependencies;
-                        if (subdependencies.dependentAll) {
-                            self.getTiddlers(subdependencies,
-                                self.processTiddlers, emiterror);
-                        } else if (subdependencies.tiddlers) {
-                            self.processTiddlers(subdependencies);
+        var currentTitle = tiddlers.shift();
+        var hasFatDependent = this.dependentTiddlers[currentTitle];
+        delete this.dependentTiddlers[currentTitle];
+        if (currentTitle === '__ignore__') {
+            self.getTiddlers(self.processTiddlers);
+        } else if (!(/^http/i).test(currentTitle)) {
+            this.getTiddler(currentTitle, function(title, content) {
+                addTiddlerContentToStore(self.store, content);
+                var subdependencies = self.store
+                    .parseTiddler(title).dependencies;
+                if (subdependencies.dependentAll) {
+                    self.dependentTiddlers['__ignore__'] = false;
+                }
+                if (subdependencies.tiddlers) {
+                    for (var subtitle in subdependencies.tiddlers) {
+                        if (hasFatDependent) {
+                            self.dependentTiddlers[subtitle]
+                                = subdependencies.tiddlers[subtitle];
                         }
                     }
-                    if (count >= tiddlerCount) {
-                        renderTiddler(self.store, self.tiddlerTitle,
-                            self.emitter);
-                    }
-                    count++;
-                }, function(err) {
-                    tiddlerCount--;
-                    if (count >= tiddlerCount) {
-                        renderTiddler(self.store, self.tiddlerTitle,
-                            self.emitter);
-                    }
-                });
-            } else {
-                tiddlerCount--;
-                if (count >= tiddlerCount) {
-                    renderTiddler(self.store, self.tiddlerTitle,
-                        self.emitter);
+                    self.processTiddlers();
                 }
-            }
+            }, function(err) {
+                console.warn('failed to get', currentTitle, err);
+                self.processTiddlers();
+            });
+        } else {
+            self.processTiddlers();
         }
     }
 };
 
 Wikifier.prototype.getTiddler = function(title, callback, errback) {
-    var parsed_uri = url.parse(this.contextURI)
-        , client = http.createClient(parsed_uri.port ? parsed_uri.port : 80,
-            parsed_uri.hostname)
+    var path = this.contextURI + '/' + encodeURIComponent(title)
+        , parsed_uri = url.parse(path)
         , self = this;
 
-    client.on('error', function(err) {
-        errback(err);
-    });
-
-    var path = parsed_uri.pathname + '/' + encodeURIComponent(title);
-    var request = client.request('GET', path, {
+    var request = http.get({
+        'path': parsed_uri.path,
         'host': parsed_uri.hostname,
-        'accept': 'application/json',
-        'cookie': this.authToken,
-        'user-agent': 'wikifier thang',
-        'x-controlview': 'false' // not needed?
-    });
-    request.end();
-
-    request.on('error', function(error) {
-        console.warn('getTiddler error', error, self.contextURI, title);
-        errback(error);
-    });
-
-    request.on('response', function(response) {
+        'headers': {
+            'accept': 'application/json',
+            'cookie': this.authToken,
+            'user-agent': 'wikifier thang',
+            'x-controlview': 'false' // not needed?
+        }
+    }, function(response) {
         if (response.statusCode === 200) {
             response.setEncoding('utf8');
             var content = '';
@@ -170,18 +137,22 @@ Wikifier.prototype.getTiddler = function(title, callback, errback) {
             errback('non 200 ' + response.statusCode + ' on ' + title);
         }
     });
+
+    request.on('error', function(error) {
+        console.warn('getTiddler error', error, self.contextURI, title);
+        errback(error);
+    });
+
 };
 
-Wikifier.prototype.getTiddlers = function(dependencies, callback, errback) {
+Wikifier.prototype.getTiddlers = function(callback) {
     var parsed_uri = url.parse(this.contextURI)
         , client = http.createClient(parsed_uri.port ? parsed_uri.port : 80,
             parsed_uri.hostname)
         , self = this
         , getTiddlersEmit = new Emitter();
 
-    client.on('error', function(err) {
-        errback(err);
-    });
+    client.on('error', this.emiterror);
     var request = client.request('GET', parsed_uri.pathname, {
         'host': parsed_uri.hostname,
         'accept': 'application/json',
@@ -194,7 +165,7 @@ Wikifier.prototype.getTiddlers = function(dependencies, callback, errback) {
     request.on('error', function(error) {
         console.warn('getTiddlers error', error, self.contextURI,
             self.tiddlerTitle);
-        errback(err);
+        this.emiterror;
     });
 
     request.on('response', function(response) {
@@ -222,11 +193,11 @@ Wikifier.prototype.getTiddlers = function(dependencies, callback, errback) {
                         self.store.addTiddler(new Tiddler(tiddlersData[i]));
                     }
                 }
-                callback.apply(self, [dependencies]);
+                callback.apply(self);
             });
         } else {
             console.warn(response.statusCode, contextURI, title);
-            errback('non 200 ' + response.statusCode + ' on ' + title);
+            this.emiterror('non 200 ' + response.statusCode + ' on ' + title);
         }
     });
 };
