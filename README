@@ -12,14 +12,23 @@ Combined these things allow wikify.js to create a TiddlyWiki store
 and render the current tiddler, with macros.
 
 Currently wikify.js expects to find its library code in a local
-directory call tiddlywiki5. This is a symlink to the js directory
-in the TiddlyWiki5 github repository. Similarly for the parsers.
+directory call TiddlyWiki5. This is a git submodule. Do the following
+to initialize:
 
-For the time being testing can be done using netcat:
+   git submodule init
+   git submodule update
 
-echo -e \
+For testing there is also one.js, which takes a tiddler name and context
+and returns output:
+
+   node one.js HelloThere http://cdent.tiddlyspace.com/recipes/cdent_public/tiddlers
+
+Testing wikify.js is done as follows:
+
+   node wikify.js &
+    echo -e \
     'HelloThere\00http://cdent.tiddlyspace.com/recipes/cdent_public/tiddlers' \
-    | nc -U /tmp/wikify.sock 
+        | nc -U /tmp/wikify.sock 
 
 TiddlySpace: http://tiddlyspace.com
 TiddlyWeb: http://tiddlyweb.com
