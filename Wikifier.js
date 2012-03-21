@@ -3,26 +3,26 @@
 
 (function(){
 
-var WikiStore = require("./tiddlywiki5/WikiStore.js").WikiStore
-    , Tiddler = require("./tiddlywiki5/Tiddler.js").Tiddler
-    , tiddlerInput = require("./tiddlywiki5/TiddlerInput.js")
-    , tiddlerOutput = require("./tiddlywiki5/TiddlerOutput.js")
-    , WikiTextParser = require("./tiddlywiki5/WikiTextParser.js").WikiTextParser
-    , JavaScriptParser = require("./tiddlywiki5/JavaScriptParser.js").JavaScriptParser
-    , utils = require("./tiddlywiki5/Utils.js")
+var WikiStore = require("./TiddlyWiki5/js/WikiStore.js").WikiStore
+    , Tiddler = require("./TiddlyWiki5/js/Tiddler.js").Tiddler
+    , tiddlerInput = require("./TiddlyWiki5/js/TiddlerInput.js")
+    , tiddlerOutput = require("./TiddlyWiki5/js/TiddlerOutput.js")
+    , WikiTextParser = require("./TiddlyWiki5/js/WikiTextParser.js").WikiTextParser
+    , JavaScriptParser = require("./TiddlyWiki5/js/JavaScriptParser.js").JavaScriptParser
+    , utils = require("./TiddlyWiki5/js/Utils.js")
     , url = require('url')
     , http = require('http')
     , Emitter = require('events').EventEmitter
     // require macros once, not per wikifier
-    , echo = require("./tiddlywiki5/macros/echo.js").macro
-    , image = require("./tiddlywiki5/macros/image.js").macro
-    , link = require("./tiddlywiki5/macros/link.js").macro
-    , list = require("./tiddlywiki5/macros/list.js").macro
-    , slider = require("./tiddlywiki5/macros/slider.js").macro
-    , story = require("./tiddlywiki5/macros/story.js").macro
-    , tiddler = require("./tiddlywiki5/macros/tiddler.js").macro
-    , version = require("./tiddlywiki5/macros/version.js").macro
-    , view = require("./tiddlywiki5/macros/view.js").macro;
+    , echo = require("./TiddlyWiki5/js/macros/echo.js").macro
+    , image = require("./TiddlyWiki5/js/macros/image.js").macro
+    , link = require("./TiddlyWiki5/js/macros/link.js").macro
+    , list = require("./TiddlyWiki5/js/macros/list.js").macro
+    , slider = require("./TiddlyWiki5/js/macros/slider.js").macro
+    , story = require("./TiddlyWiki5/js/macros/story.js").macro
+    , tiddler = require("./TiddlyWiki5/js/macros/tiddler.js").macro
+    , version = require("./TiddlyWiki5/js/macros/version.js").macro
+    , view = require("./TiddlyWiki5/js/macros/view.js").macro;
 
 var Wikifier = function() {
     var t;
