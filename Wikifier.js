@@ -22,6 +22,7 @@ var WikiStore = require("./TiddlyWiki5/js/WikiStore.js").WikiStore
     , story = require("./TiddlyWiki5/js/macros/story.js").macro
     , tiddler = require("./TiddlyWiki5/js/macros/tiddler.js").macro
     , version = require("./TiddlyWiki5/js/macros/version.js").macro
+    , video = require("./TiddlyWiki5/js/macros/video.js").macro
     , view = require("./TiddlyWiki5/js/macros/view.js").macro;
 
 var Wikifier = function() {
@@ -40,6 +41,7 @@ var Wikifier = function() {
     this.store.installMacro(story);
     this.store.installMacro(tiddler);
     this.store.installMacro(version);
+    this.store.installMacro(video);
     this.store.installMacro(view);
 };
 
